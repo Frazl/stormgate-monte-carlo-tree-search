@@ -3,6 +3,9 @@ import unit
 import random
 from collections import defaultdict
 
+def is_default_unlocked():
+    return False
+
 def get_default_state():
     default_unlocked = {
         "Shrine": True,
@@ -19,10 +22,9 @@ def get_default_state():
         "SupplyCapacity": 15,
         "Luminite": 100,
         "Therium": 0,
-        "Unlocked": defaultdict(lambda: False, default_unlocked)
+        "Unlocked": defaultdict(is_default_unlocked, default_unlocked)
     }
     return state
-    
 
 def main():
     state = get_default_state()
@@ -34,23 +36,48 @@ def main():
 def get_action_id(action):
     return action['Action'] + '-' + action['Payload']['Name']
 
+def get_pretty_time(state):
+    return f"{state['Time'] // 60}:{state['Time'] % 60}"
+
 def get_possible_actions(state):
     builds = get_possible_buildings(state)        
     units = get_possible_units(state)
-    nothing = [{"Action": "Idle", "Payload": {"Name": "-"}}]
-    return builds + units + nothing
+    # nothing = [{"Action": "Idle", "Payload": {"Name": "-"}}]
+    return builds + units
 
 def get_possible_buildings(state):
     all_buildings = building.get_buildings()
     possible_buildings = []
     for b in all_buildings:
         if state['Unlocked'][b['Name']]:
-            if resources_exist(state, b):
+            if resources_exist(state, b) and worker_available(state):
                 possible_buildings.append({
                     "Action": 'BuildBuilding',
                     "Payload": b
                 })
     return possible_buildings
+
+def special_unit_build_requirements_met(state, u):
+    if u['Name'] == 'Imp':
+        shrines = [b for b in state['Buildings'] if (b['Name'] == 'Shrine' or b['Name'] == 'Greater Shrine')]
+        for shrine in shrines:
+            if shrine['Workers'] < 13:
+                return True
+        return False 
+    elif u['Name'] == 'TImp':
+        shrines = [b for b in state['Buildings'] if (b['Name'] == 'Shrine' or b['Name'] == 'Greater Shrine')]
+        if shrine['TheriumWorkers'] < 13:
+                return True
+        return False
+    else:
+        return True
+
+def get_action_if_possible(state, actionID):
+    actions = get_possible_actions(state)
+    for action in actions:
+        if get_action_id(action) == actionID:
+            return action
+    return None
 
 def get_possible_units(state):
     all_units = unit.get_units()
@@ -61,33 +88,44 @@ def get_possible_units(state):
             # Add check to see if we have unit supply 
             source_buildings = [b for b in state['Buildings'] if b['Name'] == u['Requires']]
             if (sum([1 for b in source_buildings if b['UnitSupply']])):
-                if resources_exist(state, u) and supply_exists(state, u):
+                if resources_exist(state, u) and supply_exists(state, u) and special_unit_build_requirements_met(state, u):
                     possible_units.append({
                         "Action": 'BuildUnit',
                         "Payload": u
                     })
     return possible_units
 
+def worker_available(state):
+    return sum([1 for b in state['Buildings'] if (b['Name'] == 'Shrine' or b['Name'] == 'Greater Shrine') and b['Workers'] > 0])
+
 def perform_action(state, choice):
     if choice['Action'] == 'DoNothing':
         return state
     elif choice['Action'] == 'BuildBuilding':
+        # remove an imp
         shrinesWithWorkers = [b for b in state['Buildings'] if (b['Name'] == 'Shrine' or b['Name'] == 'Greater Shrine') and b['Workers'] > 0]
         random.choice(shrinesWithWorkers)['Workers'] -= 1
+        state['Units'].remove('Imp')
+        
+        # Start building
         toBuild = choice['Payload']
         state['Queue'].append({"Type": choice['Action'], "Name": toBuild['Name'], 'timeRequired': toBuild['Walk Time'] + toBuild['Build Time'], "Progress": 0})
+        # Remove resources
         state['Luminite'] -= toBuild['Luminite']
         state['Therium'] -= toBuild['Therium']
+        
         pass
     elif choice['Action'] == 'BuildUnit':
         u = choice['Payload']
         if u['Name'] == 'Imp':
             # increment workers in a random shrine
-            shrinesWithNonMaxWorkers = [b for b in state['Buildings'] if (b['Name'] == 'Shrine' or b['Name'] == 'Greater Shrine') and b['Workers'] < 12]
+            shrinesWithNonMaxWorkers = [b for b in state['Buildings'] if (b['Name'] == 'Shrine' or b['Name'] == 'Greater Shrine') and b['Workers'] < 13]
             if len(shrinesWithNonMaxWorkers):
                 shrine = random.choice(shrinesWithNonMaxWorkers)
                 shrine['Workers'] += 1
                 shrine['UnitSupply'] -= 1
+            else: 
+                print("UH OH AN IMP SHOULDNT HAVE BEEN BUILT!")
         if u['Name'] == 'ImpT':
             # increment workers in a random shrine
             shrinesWithNonMaxWorkers = [b for b in state['Buildings'] if (b['Name'] == 'Shrine' or b['Name'] == 'Greater Shrine') and b['Workers'] < 12 and b['UnitSupply'] > 0]
@@ -147,8 +185,8 @@ def buildings_builder(state, buildingName):
         state['SupplyCapacity'] += 10
     else:
         state['Buildings'].append({"Name": buildingName, "UnitSupply": 1, "NextUnitProgress": 0})
-        # handle unit production building
-        
+        for bName in building.get_buildings_map()[buildingName]['Unlocks'].split(","):
+            state['Unlocked'][bName] = True
     return state
 
 def _print_actions(time, actions):
@@ -157,10 +195,11 @@ def _print_actions(time, actions):
 
 def tick(state):
     possible_actions = get_possible_actions(state)
-    choice = random.choice(possible_actions)
-    _print_actions(state['Time'], possible_actions)
-    _print_actions(state['Time'], [choice])
-    state = perform_action(state, choice)
+    if len(possible_actions):
+        choice = random.choice(possible_actions)
+        _print_actions(state['Time'], possible_actions)
+        _print_actions(state['Time'], [choice])
+        state = perform_action(state, choice)
     state['Time'] += 1
     state = handle_production(state) # Handles building buildings in progress, updating currency collected by workers etc.
     return state

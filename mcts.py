@@ -18,7 +18,7 @@ def is_terminal(state):
 
 def state_heuristic(state, node):
     mod_state = copy.deepcopy(state)
-    return ( game.perform_action(mod_state, node.action)['Luminite'] / TARGET_LUMINITE ) * 10
+    return ( game.simulate_action(mod_state, node.action)['Luminite'] / TARGET_LUMINITE ) * 10
 
 # game.get_default_state() will get the initial state of a game 
 # copy.deepcopy(root_state) could be used to do a deep copy when we wish to mutate the state
@@ -30,7 +30,7 @@ class Node:
         self.action = action
         self.parent = parent
         self.children = []
-        self.visits = 0    
+        self.visits = 1   
         self.wins = 0
 
 def mcts(root_state, num_iterations):
@@ -51,8 +51,6 @@ def mcts(root_state, num_iterations):
                     expand_node(node, action)
         # Simulation phase
         winner = simulate(state)
-        if winner:
-            print(winner)
         # Backpropagation phase
         backpropagate(node, winner)
     # Choose best action based on visit counts
@@ -67,7 +65,7 @@ def expand_node(parent, action):
 # Simulation phase: Simulate a game from the current state and return the winner
 def simulate(state):
     # In this simplified example, we'll randomly choose a winner after a fixed number of steps
-    max_steps = 900
+    max_steps = 10
     for _ in range(max_steps):
         if is_terminal(state):
             return is_winner(state)
@@ -98,8 +96,8 @@ def select_child(node, state):
     best_child = None
     best_score = -1
     for child in node.children:
-        if child.visits == 0:
-            exploration_term = state_heuristic(state, node)
+        if child.wins == 0:
+            exploration_term = state_heuristic(state, child)
         else:
             exploration_term = math.sqrt(2 * math.log(total_visits) / child.visits)
         ucb_score = child.visits + exploration_term
@@ -110,14 +108,17 @@ def select_child(node, state):
 
 
 if __name__ == '__main__':
-    root_node = mcts(game.get_default_state(), 5)
+    root_node = mcts(game.get_default_state(), 500)
     for child in root_node.children:
         print(game.get_action_id(child.action))
     print('-' * 80)
     print(root_node.wins)
+    state = game.get_default_state()
     while root_node:
         root_node = best_child(root_node)
         if root_node:
-            action = game.get_action_id(root_node.action)
-            if action != "Idle--":
+            action_id = game.get_action_id(root_node.action)
+            state = game.simulate_action(state, root_node.action)
+            if action_id != "Idle--":
                 print(game.get_action_id(root_node.action))
+    print(state)
