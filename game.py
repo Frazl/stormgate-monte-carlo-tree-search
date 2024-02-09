@@ -10,6 +10,7 @@ def get_default_state():
     default_unlocked = {
         "Shrine": True,
         "Imp": True,
+        "ImpT": True,
         "Iron Vault": True,
         "Conclave": True,
         "Meat Farm": True,
@@ -37,7 +38,10 @@ def get_action_id(action):
     return action['Action'] + '-' + action['Payload']['Name']
 
 def get_pretty_time(state):
-    return f"{state['Time'] // 60}:{state['Time'] % 60}"
+    seconds = state['Time'] % 60
+    seconds = str(seconds)
+    seconds = seconds if len(seconds) == 2 else '0'+seconds
+    return f"{state['Time'] // 60}:{seconds}"
 
 def get_possible_actions(state):
     builds = get_possible_buildings(state)        
@@ -64,10 +68,11 @@ def special_unit_build_requirements_met(state, u):
             if shrine['Workers'] < 13:
                 return True
         return False 
-    elif u['Name'] == 'TImp':
+    elif u['Name'] == 'ImpT':
         shrines = [b for b in state['Buildings'] if (b['Name'] == 'Shrine' or b['Name'] == 'Greater Shrine')]
-        if shrine['TheriumWorkers'] < 13:
-                return True
+        for shrine in shrines:
+            if shrine['TheriumWorkers'] < 5:
+                    return True
         return False
     else:
         return True
@@ -128,7 +133,7 @@ def perform_action(state, choice):
                 print("UH OH AN IMP SHOULDNT HAVE BEEN BUILT!")
         if u['Name'] == 'ImpT':
             # increment workers in a random shrine
-            shrinesWithNonMaxWorkers = [b for b in state['Buildings'] if (b['Name'] == 'Shrine' or b['Name'] == 'Greater Shrine') and b['Workers'] < 12 and b['UnitSupply'] > 0]
+            shrinesWithNonMaxWorkers = [b for b in state['Buildings'] if (b['Name'] == 'Shrine' or b['Name'] == 'Greater Shrine') and b['TheriumWorkers'] < 5 and b['UnitSupply'] > 0]
             if len(shrinesWithNonMaxWorkers):
                 shrine = random.choice(shrinesWithNonMaxWorkers)
                 shrine['TheriumWorkers'] += 1
@@ -148,7 +153,7 @@ def handle_production(state):
     # Handle Resources
     shrines = [b for b in state['Buildings'] if b['Name'] == 'Shrine' or b['Name'] == 'Greater Shrine']
     for shrine in shrines:
-        state['Luminite'] += shrine['Workers']
+        state['Luminite'] += min(12, shrine['Workers'])
         state['Therium'] += shrine['TheriumWorkers'] * 0.8
     # Handle Construction of Buildings 
     for construction in state['Queue']:

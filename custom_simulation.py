@@ -1,23 +1,15 @@
 import game 
 
 queue = [
-    'BuildBuilding-Shrine',
-    'BuildUnit-Imp', #9
+    'BuildUnit-Imp', #10
+    'BuildBuilding-Iron Vault', #9
+    'BuildBuilding-Conclave', #8
+    'BuildUnit-ImpT', #
+    'BuildUnit-Imp', #10
     'BuildUnit-Imp', #11
-    'BuildUnit-Imp', #12
-    'BuildUnit-Imp', #13
-    'BuildBuilding-Meat Farm', #12
-    'BuildBuilding-Iron Vault', #12
+    'BuildBuilding-Meat Farm', #10
+    'BuildUnit-Gaunt', # 24
     'BuildUnit-Brute', # 24
-    'BuildUnit-Brute', # 24
-    'BuildBuilding-Meat Farm', #12
-    'BuildUnit-Imp', # 24
-    'BuildUnit-Imp', # 24
-    'BuildUnit-Imp', # 24
-    'BuildUnit-Imp', # 24
-    'BuildUnit-Imp', # 24
-    'BuildUnit-Imp', # 24
-    'BuildUnit-Imp', # 24
 ]
 
 
@@ -38,3 +30,4 @@ if __name__ == '__main__':
     for item, value in state.items():
         print(item, value)
         print("-" * 20)
+    print(state['Units'].count("Imp"), "Imps")
